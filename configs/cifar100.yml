@@ -1,0 +1,22 @@
+dataset:
+    name: CIFAR100
+
+architecture:
+    backbone: ResNet
+    backbone_model: 50
+    hypers:
+        nodes_head: []
+        penultimate_nodes: 36
+        activation: SiLU
+
+
+training:
+    hypers:
+        batch_size: 128
+        epochs: 200
+        logging: 20
+        gamma: 0.01
+        gamma_scheduler_factor: 1.084
+        gamma_scheduler_step: 1
+        optimizer: AdamW
+        weight_decay: 0.0005

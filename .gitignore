@@ -1,5 +1,7 @@
 results
 dataset
+datasets
+jobs_output
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -1,18 +1,39 @@
 # Emergence of Latent Binary Encoding in Deep Neural Network Classifiers
-Code to reproduce results presented in the work [ Emergence of Latent Binary Encoding in Deep Neural Network Classifiers](https://arxiv.org/abs/2310.08224) as part of the "Symmetry and Geometry in
-Neural Representations" workshop taking place at NeurIPS 2023.
+Code to reproduce results presented in the manuscript [Emergence of Latent Binary Encoding in Deep Neural Network Classifiers](https://arxiv.org/abs/2310.08224).
 
-# Abstract
-We observe the emergence of binary encoding within the latent space of deep-neural-network classifiers.
-Such binary encoding is induced by introducing a linear penultimate layer,  which is equipped during training with a loss function that grows as $\exp(\vec{x}^2)$, where $\vec{x}$ are the coordinates in the latent space. 
-The phenomenon we describe represents a specific instance of a well-documented occurrence known as neural collapse, which arises in the terminal phase of training and entails the collapse of latent class means to the vertices of a simplex equiangular tight frame (ETF).
-We show that binary encoding accelerates convergence toward the simplex ETF and enhances classification accuracy.
+### Abstract
+We investigate the emergence of binary encoding within the latent space of deep-neural-network classifiers.
+Such binary encoding is induced by the integration of a linear penultimate layer, which employs during training a loss function specifically designed to compress the latent representations. 
+As a result of a trade-off between compression and information retention, the network learns to assume only one of two possible values for each dimension in the latent space.
+The binary encoding is provoked by the collapse of all representations of the same class to the same point, which corresponds to the vertex of a hypercube, thereby creating the encoding.
+We demonstrate that the emergence of binary encoding significantly enhances robustness, reliability and accuracy of the network.
 
-# Run the code
-The following piece of code reproduces results presented in the manuscript:
+### Dependencies 
+Code was tested on Python 3.11.8, PyTorch 2.2.1, NumPy 1.26, scikit-learn 1.2.2, and SciPy 1.11.4.
+
+### Install
+```
+pip install emergence_binary_encoding
+```
+
+### Reproduce results 
+Results can be reproduced on a GPU cluster using a slurm script that we provide in `scripts/run_slurm_jobs.sh`. The script is assumed to be run in a conda environment named _bin_enc_ where the dependencies indicated above and the package _emergence_binary_encoding_ are installed. We utilized NVIDIA A100 GPUs, as indicated in the _gres_ argument in the script. Training for the CIFAR10 and CIFAR100 datasets can be run with the commands:
 
 ```
-python main.py --config config/mnist.yml --results-dir ./results_mnist
-python main.py --config config/fashion.yml --reuslts-dir ./results_fashion
+scripts/run_slurm_jobs.sh configs/cifar10.yml cifar10 datasets results jobs_outputs
+scripts/run_slurm_jobs.sh configs/cifar100.yml cifar100 datasets results jobs_outputs
 ```
-Metrics collected during trainings on the MNIST and FashinMNIST datasets are saved respectively in the './results_mnist' and './results_fashion' directories.
+
+where the `cifar10.yml` and `cifar100.yml` files contain all training hyperparameters, the 'datasets' directory is created to store the loaded datasets, the `results` directory is created to store all training results, and the `jobs_output` directory is created to store all slurms jobs outputs. 
+For each of the 5 experiments, a number of training results are produced with different learning rates, and the best results in each experiment can be picked with `scripts/find_best_results.py`:
+
+```
+python scripts/find_best_results.py results/cifar10
+python scripts/find_best_results.py results/cifar100
+```
+
+Results can finally be visualized using the Jupyter notebook `notebooks/plots.ipynb`.
+
+### Demonstrative training
+A short training to demonstate the emergence of binary encoding can be done with the _emergence_binary_encoding_ package in the Jupyter notebook `notebooks/train.ipynb`.
+
