@@ -6,6 +6,7 @@ from binary_encoding.metrics import (
     get_collapse_metrics,
     get_binarity_metrics,
     get_mahalanobis_score,
+    get_same_encoding_fraction,
 )
 from binary_encoding.deepfool import deepfool
 
