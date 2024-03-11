@@ -28,8 +28,8 @@ where the `cifar10.yml` and `cifar100.yml` files contain all training hyperparam
 For each of the 5 experiments, a number of training results are produced with different learning rates, and the best results in each experiment can be picked with `scripts/find_best_results.py`:
 
 ```
-python scripts/find_best_results.py results/cifar10
-python scripts/find_best_results.py results/cifar100
+python scripts/find_best_results.py --results-dir results/cifar10 --output-dir results/cifar10
+python scripts/find_best_results.py --results-dir results/cifar100 --output-dir results/cifar100
 ```
 
 Results can finally be visualized using the Jupyter notebook `notebooks/plots.ipynb`.
