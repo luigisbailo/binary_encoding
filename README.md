@@ -14,7 +14,7 @@ pip install .
 ```
 
 ### Reproduce results 
-Results can be reproduced on a GPU cluster using a slurm script that we provide in `scripts/run_slurm_jobs.sh`. The script is assumed to be run in a conda environment named _bin_enc_ where the dependencies indicated above and the package _emergence_binary_encoding_ are installed. We utilized NVIDIA A100 GPUs, as indicated in the _gres_ argument in the script. Training for the CIFAR10 and CIFAR100 datasets can be run with the commands:
+Results can be reproduced on a GPU cluster using a slurm script that we provide in `scripts/run_slurm_jobs.sh`. The script is assumed to be run in a conda environment named _bin_enc_ where the dependencies indicated above and the package defined in this repository is installed. We utilized NVIDIA A100 GPUs, as indicated in the _gres_ argument in the script. Training for the CIFAR10 and CIFAR100 datasets can be run with the commands:
 
 ```
 scripts/run_slurm_jobs.sh configs/cifar10.yml cifar10 datasets results jobs_outputs
