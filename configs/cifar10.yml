@@ -6,17 +6,22 @@ architecture:
     backbone_model: 18
     hypers:
         nodes_head: []
-        penultimate_nodes: 4
+        penultimate_nodes: 6
         activation: SiLU
 
 
 training:
     hypers:
         batch_size: 128
-        epochs: 200
-        logging: 20
+        epochs: 1000
+        logging: 50
         gamma: 0.01
-        gamma_scheduler_factor: 1.084
+        gamma_scheduler_factor: 1.05
         gamma_scheduler_step: 1
+        gamma_max_exp: 6
+        lr_scheduler_step_size: 50
+        lr_scheduler_gamma: 0.5
+        lr_scheduler_start: 250
         optimizer: AdamW
         weight_decay: 0.0005
+        convergence_thres: 0.999
