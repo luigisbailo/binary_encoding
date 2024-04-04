@@ -17,6 +17,7 @@ pip install .
 Results can be reproduced on a GPU cluster using a slurm script that we provide in `scripts/run_slurm_jobs.sh`. The script is assumed to be run in a conda environment named _bin_enc_ where the dependencies indicated above and the package defined in this repository is installed. We utilized NVIDIA A100 GPUs, as indicated in the _gres_ argument in the script. Training for the CIFAR10 and CIFAR100 datasets can be run with the commands:
 
 ```
+scripts/run_slurm_jobs.sh configs/svhn.yml svhn datasets results jobs_outputs
 scripts/run_slurm_jobs.sh configs/cifar10.yml cifar10 datasets results jobs_outputs
 scripts/run_slurm_jobs.sh configs/cifar100.yml cifar100 datasets results jobs_outputs
 ```
@@ -25,6 +26,7 @@ where the `cifar10.yml` and `cifar100.yml` files contain all training hyperparam
 For each of the 5 experiments, a number of training results are produced with different learning rates, and the best results in each experiment can be picked with `scripts/find_best_results.py`:
 
 ```
+python scripts/find_best_results.py --results-dir results/svhn --output-dir results/svhn
 python scripts/find_best_results.py --results-dir results/cifar10 --output-dir results/cifar10
 python scripts/find_best_results.py --results-dir results/cifar100 --output-dir results/cifar100
 ```
