@@ -6,6 +6,7 @@ import importlib
 import numpy as np
 import torch
 import torchvision.transforms as transforms
+from torchvision.transforms import Resize
 
 import binary_encoding.networks as networks
 from binary_encoding.trainer import Trainer
@@ -92,6 +93,8 @@ if __name__ == '__main__':
     parser.add_argument('--model', required=True)
     parser.add_argument('--sample', required=False)
     parser.add_argument('--lr', required=False)
+    parser.add_argument('--dropout', required=False)
+    parser.add_argument('--augment', required=False)
     parser.add_argument('--encoding-metrics', required=False)
     parser.add_argument('--store-penultimate', required=False)
 
@@ -103,6 +106,8 @@ if __name__ == '__main__':
     model = args.model
     sample = args.sample
     lr = args.lr
+    dropout = args.dropout
+    augment = args.augment
     encoding_metrics = args.encoding_metrics
     store_penultimate = args.store_penultimate
 
@@ -124,7 +129,24 @@ if __name__ == '__main__':
         encoding_metrics = False
     else:
         encoding_metrics = encoding_metrics == 'true'
+        
+    # If dropout is not provided, default to False
+    dropout = dropout.lower() if dropout else False
+    if dropout not in ['true', 'false']:
+        print("Invalid value for dropout. Defaulting to False.")
+        dropout = False
+    else:
+        dropout = dropout == 'true'
+    architecture['hypers']['dropout_backbone'] = dropout
 
+    # If augment is not provided, default to False
+    augment = augment.lower() if augment else False
+    if augment not in ['true', 'false']:
+        print("Invalid value for augment. Defaulting to False.")
+        augment = False
+    else:
+        augment = augment == 'true'
+    
     # If store_penultimate is not provided, default to False
     store_penultimate = store_penultimate.lower() if store_penultimate else False
     if store_penultimate not in ['true', 'false']:
@@ -133,32 +155,67 @@ if __name__ == '__main__':
     else:
         store_penultimate = store_penultimate == 'true'
 
-    torch_module = importlib.import_module("torchvision.datasets")
-    torch_dataset = getattr(torch_module, name_dataset)
     transform = transforms.Compose([transforms.ToTensor()])
-    trainset = torch_dataset(
-        str(dataset_dir), train=True, download=True, transform=transform)
-    trainset_mean, trainset_std = compute_mean_std(trainset)
+    torch_module = importlib.import_module("torchvision.datasets")
 
-    transform_train = transforms.Compose([
+    if (name_dataset == 'SVHN'):
+        torch_dataset = getattr(torch_module, name_dataset)
+        trainset = torch_dataset(
+            str(dataset_dir), split='train', download=True, transform=transform)
+    else :
+        torch_dataset = getattr(torch_module, name_dataset)
+        trainset = torch_dataset(
+            str(dataset_dir), train=True, download=True, transform=transform)
+
+    
+    if (name_dataset == 'SVHN'):
+        transform_train = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize(0.5, 0.5),
+            transforms.RandomHorizontalFlip(),
+            transforms.RandomCrop(trainset[0][0][0][0].shape[0], padding=4),
+            Resize((32, 32)),  
+
+        ])
+        transform_test = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize(0.5, 0.5),
+            Resize((32, 32)),  
+
+        ])
+    else:
+        trainset_mean, trainset_std = compute_mean_std(trainset)
+        transform_train = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize(trainset_mean, trainset_std),
         transforms.RandomHorizontalFlip(),
         transforms.RandomCrop(trainset[0][0][0][0].shape[0], padding=4),
-    ])
+            
+        ])
 
-    transform_test = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize(trainset_mean, trainset_std),
-    ])
+        transform_test = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize(trainset_mean, trainset_std),
+        ])
 
-    trainset = torch_dataset(
-        str(dataset_dir), train=True, download=True, transform=transform_train)
-    testset = torch_dataset(
-        str(dataset_dir), train=False, download=True, transform=transform_test)
+    
+    if (name_dataset == 'SVHN'):
+        trainset = torch_dataset(
+        str(dataset_dir), split='train', download=True, transform=transform_train)
+        testset = torch_dataset(
+            str(dataset_dir), split='test', download=True, transform=transform_test)
+    else:
+        trainset = torch_dataset(
+            str(dataset_dir), train=True, download=True, transform=transform_train)
+        testset = torch_dataset(
+            str(dataset_dir), train=False, download=True, transform=transform_test)
 
     input_dims = trainset[0][0].numel()
-    num_classes = len(set(trainset.classes))
+    if (name_dataset == 'SVHN'):
+        num_classes = 10
+    else:
+        num_classes = len(set(trainset.classes))
+    
     training_hypers = convert_bool(training_hypers)
     architecture['hypers'] = convert_bool(architecture['hypers'])
 
@@ -171,8 +228,12 @@ if __name__ == '__main__':
         num_classes=num_classes,
         input_dims=input_dims,
         )
+    if torch.cuda.device_count() > 1:
+        print('data parallel')
+        classifier = torch.nn.DataParallel(classifier)
     if torch.cuda.is_available():
         classifier = classifier.to(device)
+
 
     results = Trainer(
         device=device,
@@ -185,12 +246,24 @@ if __name__ == '__main__':
         store_penultimate=store_penultimate,
         verbose=True
         ).fit()
+    
+    print('finished_training')
+    
     results['training_hypers'] = training_hypers
     results['architecture'] = architecture
-
-    if sample:
-        file_name = '/' + model + '_' + sample + '.pkl'
+    
+    if dropout:
+        if sample:
+            file_name = '/dropout_' + model + '_' + sample + '.pkl'
+        else:
+            file_name = '/dropout_' + model + '.pkl'
     else:
-        file_name = '/' + model + '.pkl'
+        if sample:
+            file_name = '/' + model + '_' + sample + '.pkl'
+        else:
+            file_name = '/' + model + '_' + '.pkl'
+    
+    print(file_name)
+            
     with open(str(results_dir) + file_name, 'wb') as file:
         pickle.dump(results, file)

@@ -1,7 +1,8 @@
 import importlib
 import torch
-import torch.nn as nn
 import numpy as np
+import torch.nn as nn
+from torch.optim.lr_scheduler import StepLR
 from binary_encoding.metrics import (
     get_collapse_metrics,
     get_binarity_metrics,
@@ -46,12 +47,6 @@ class Trainer():
         self.encoding_metrics = encoding_metrics
         self.store_penultimate = store_penultimate
         self.verbose = verbose
-        torch_module = importlib.import_module("torch.optim")
-        self.opt = getattr(torch_module, self.training_hypers['optimizer'])(
-            self.network.parameters(),
-            lr=self.training_hypers['lr'],
-            weight_decay=self.training_hypers['weight_decay']
-        )
 
     def fit(self):
         """
@@ -60,7 +55,29 @@ class Trainer():
         Returns:
         - res_dict_stack (dict): A dictionary containing the stacked training results.
         """
+        
+        torch_optim_module = importlib.import_module("torch.optim")
+        
+        model_ref = self.network.module if isinstance(self.network, nn.DataParallel) else self.network
 
+        excluded_params = set(model_ref.output_layer.parameters())
+
+        other_params = [param for name, param in model_ref.named_parameters() if param not in excluded_params]
+        excluded_params = list(excluded_params)  
+        params_to_update = [
+            {'params': other_params, 'lr': self.training_hypers['lr']},
+            {'params': excluded_params, 'lr': self.training_hypers['lr']}
+        ]
+
+        self.opt = getattr(torch_optim_module, self.training_hypers['optimizer'])(
+            params_to_update,
+            weight_decay=self.training_hypers['weight_decay']
+        )
+
+        self.scheduler = StepLR(
+            self.opt, step_size=self.training_hypers['lr_scheduler_step_size'], gamma=self.training_hypers['lr_scheduler_gamma']
+        )
+        
         trainloader = torch.utils.data.DataLoader(
             self.trainset,
             batch_size=self.training_hypers['batch_size'],
@@ -71,9 +88,12 @@ class Trainer():
         res_dict_stack = {}
 
         gamma = self.training_hypers['gamma']
-
+        gamma_max = 10**self.training_hypers['gamma_max_exp']
+        converged = False
+        convergence_thres = self.training_hypers['convergence_thres']
+        
         for epoch in range(1, self.training_hypers['epochs']+1):
-
+            
             self.network.train()
 
             for x_batch, y_batch in trainloader:
@@ -97,15 +117,16 @@ class Trainer():
                     loss = loss + loss_encoding*gamma
 
                 loss.backward()
-
+                
                 self.opt.step()
+            
 
-            if epoch % self.training_hypers['gamma_scheduler_step'] == 0:
+            if epoch % self.training_hypers['gamma_scheduler_step'] == 0 and gamma < gamma_max:
                 gamma = gamma * self.training_hypers['gamma_scheduler_factor']
 
             if epoch % self.training_hypers['logging'] == 0 or \
                     epoch == self.training_hypers['epochs']:
-
+                
                 if self.verbose:
                     print('Epoch', epoch)
 
@@ -135,33 +156,47 @@ class Trainer():
                     res_epoch['binarity_train'] = get_binarity_metrics(eval_train)
                     res_epoch['binarity_test'] = get_binarity_metrics(eval_test)
 
-                last_epoch = epoch == self.training_hypers['epochs']
-                if last_epoch:
-                    loader = torch.utils.data.DataLoader(
-                        self.testset,
-                        batch_size=1000,
-                        shuffle=True
+                loader = torch.utils.data.DataLoader(
+                    self.testset,
+                    batch_size=1000,
+                    shuffle=True
+                )
+                images = next(iter(loader))[0]
+                perturbation_list = []
+                for image in images:
+                    r_tot, loop_i, label, k_i, pert_image = deepfool(
+                        image,
+                        self.network
                     )
-                    images = next(iter(loader))[0]
-                    perturbation_list = []
-                    for image in images:
-                        r_tot, loop_i, label, k_i, pert_image = deepfool(
-                            image,
-                            self.network
-                        )
-                        perturbation_list.append(
-                            np.linalg.norm(r_tot) /
-                            np.linalg.norm(image.cpu().numpy())
-                        )
-                    res_epoch['perturbation_score'] = np.mean(perturbation_list)
+                    perturbation_list.append(
+                        np.linalg.norm(r_tot) /
+                        np.linalg.norm(image.cpu().numpy())
+                    )
 
-                    res_epoch['mahalanobis_score'] = get_mahalanobis_score(eval_train, eval_test)
+                last_epoch = epoch == self.training_hypers['epochs'] 
+                
+                
+                if eval_train['accuracy'] > convergence_thres and converged==False :
+                    converged = True
+                    print('converged!', epoch)
+                    convergence_epoch = epoch
+                    perturbation_score_converged = np.mean(perturbation_list)
+                    mahalanobis_score_converged = get_mahalanobis_score(eval_train, eval_test)
+                    accuracy_test_converged = eval_test['accuracy']
 
-                    if self.store_penultimate:
-                        res_epoch['penultimate_train'] = eval_train['x_penultimate']
-                        res_epoch['penultimate_test'] = eval_test['x_penultimate']
-
+                if last_epoch:
+                    perturbation_score_tpt = np.mean(perturbation_list)
+                    mahalanobis_score_tpt = get_mahalanobis_score(eval_train, eval_test)
+                
+                if self.store_penultimate and last_epoch:
+                    penultimate_train = eval_train['x_penultimate']
+                    penultimate_test = eval_test['x_penultimate']
+                    
                 res_list.append(res_epoch)
+            
+            if epoch > self.training_hypers['lr_scheduler_start']:
+                self.scheduler.step()        
+                self.opt.param_groups[1]['lr'] = self.training_hypers['lr']
 
         for key in res_list[0].keys():
 
@@ -181,13 +216,19 @@ class Trainer():
                         )                    
             else:                
                 res_dict_stack[key] = np.vstack([res_epoch[key] for res_epoch in res_list])
+        
+        res_dict_stack['mahalanobis_score_converged'] = mahalanobis_score_converged
+        res_dict_stack['perturbation_score_converged'] = perturbation_score_converged
+        res_dict_stack['convergence_epoch'] = convergence_epoch
+        res_dict_stack['accuracy_test_converged'] = accuracy_test_converged
 
-        res_dict_stack['mahalanobis_score'] = res_epoch['mahalanobis_score']
-        res_dict_stack['perturbation_score'] = res_epoch['perturbation_score']
+        res_dict_stack['mahalanobis_score_tpt'] = mahalanobis_score_tpt
+        res_dict_stack['perturbation_score_tpt'] = perturbation_score_tpt
 
         if self.store_penultimate:
-            res_dict_stack['penultimate_train'] = res_epoch['penultimate_train']
-            res_dict_stack['penultimate_test'] = res_epoch['penultimate_test']
+            res_dict_stack['penultimate_train'] = penultimate_train
+            res_dict_stack['penultimate_test'] = penultimate_test
+
 
         return res_dict_stack
 
@@ -240,3 +281,8 @@ class Trainer():
             evaluations['accuracy'] = accuracy
 
         return evaluations
+    
+    
+    
+    
+    

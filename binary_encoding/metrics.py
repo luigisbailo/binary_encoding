@@ -54,6 +54,8 @@ def get_collapse_metrics(evaluations):
     within_class_variation = np.trace(
         np.matmul(sigma_w, scipy.linalg.pinv(sigma_b))
         ) / len(class_mean_centered)
+    within_class_variation_weighted = within_class_variation / x_penultimate.shape[1]
+    
     sigma_w = np.mean(sigma_w)
 
     cosine = []
@@ -77,17 +79,21 @@ def get_collapse_metrics(evaluations):
                 )
 
     cosine = np.stack(cosine)
-
+    relative_norm = np.stack(relative_norm)
+    
     equiangular = np.std(cosine)
     maxangle = np.mean(cosine_max)
     equinorm = np.std(np.linalg.norm(class_mean_centered, axis=1))\
         / np.mean(np.linalg.norm(class_mean_centered, axis=1))
-
+    relative_norm_std = np.std(relative_norm) / np.mean(relative_norm) 
+    
     collapse_results_dict['within_class_variation'] = within_class_variation
+    collapse_results_dict['within_class_variation_weighted'] = within_class_variation_weighted
     collapse_results_dict['equiangular'] = equiangular
     collapse_results_dict['maxangle'] = maxangle
     collapse_results_dict['equinorm'] = equinorm
     collapse_results_dict['sigma_w'] = sigma_w
+    collapse_results_dict['relative_norm_std'] = relative_norm_std
 
     return collapse_results_dict
 
@@ -171,15 +177,15 @@ def get_same_encoding_fraction(evaluations):
     y_predicted = evaluations['y_predicted']
     y_label = evaluations['y_label']
 
-    fraction_list = []
-
+    same_encoding = []
+    
     for class_label in np.unique(y_label):
-        for d in range(x_penultimate.shape[1]):
-            selection_classified = y_predicted == class_label
-            if (np.sum(selection_classified) > 0):
-                fraction_d = (x_penultimate[selection_classified][:, d] > 0).mean()
-                fraction_list.append(max(fraction_d, 1-fraction_d))
-    fraction = np.mean(fraction_list)
+        class_selection = y_predicted == class_label
+        binary_encoding = np.where( x_penultimate[class_selection] > 0, 1, 0)
+        _, counts = np.unique(binary_encoding, return_counts=True, axis=0)
+        same_encoding.append(np.max(counts))
+
+    fraction = np.sum(same_encoding) / len(x_penultimate)
 
     return fraction
 

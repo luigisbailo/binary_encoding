@@ -234,30 +234,55 @@ class BasicBlock(nn.Module):
             in_channels,
             out_channels,
             activation,
-            stride=1):
+            stride=1,
+            dropout=False,
+    ):
 
         super(BasicBlock, self).__init__()
-
-        self.residual_function = nn.Sequential(
-            nn.Conv2d(
-                in_channels,
-                out_channels,
-                stride=stride,
-                kernel_size=3,
-                padding=1,
-                bias=False
-                ),
-            nn.BatchNorm2d(out_channels),
-            activation(inplace=True),
-            nn.Conv2d(
-                out_channels,
-                out_channels * BasicBlock.expansion,
-                kernel_size=3,
-                padding=1,
-                bias=False
-                ),
-            nn.BatchNorm2d(self.expansion*out_channels)
-            )
+        
+        if dropout:
+            self.residual_function = nn.Sequential(
+                nn.Conv2d(
+                    in_channels,
+                    out_channels,
+                    stride=stride,
+                    kernel_size=3,
+                    padding=1,
+                    bias=False
+                    ),
+                nn.BatchNorm2d(out_channels),
+                activation(inplace=True),
+                nn.Dropout(p=0.5),
+                nn.Conv2d(
+                    out_channels,
+                    out_channels * BasicBlock.expansion,
+                    kernel_size=3,
+                    padding=1,
+                    bias=False
+                    ),
+                nn.BatchNorm2d(self.expansion*out_channels)
+                )
+        else:
+            self.residual_function = nn.Sequential(
+                nn.Conv2d(
+                    in_channels,
+                    out_channels,
+                    stride=stride,
+                    kernel_size=3,
+                    padding=1,
+                    bias=False
+                    ),
+                nn.BatchNorm2d(out_channels),
+                activation(inplace=True),
+                nn.Conv2d(
+                    out_channels,
+                    out_channels * BasicBlock.expansion,
+                    kernel_size=3,
+                    padding=1,
+                    bias=False
+                    ),
+                nn.BatchNorm2d(self.expansion*out_channels)
+                )
 
         self.shortcut = nn.Sequential()
 
@@ -311,37 +336,69 @@ class Bottleneck(nn.Module):
             in_channels,
             out_channels,
             activation,
-            stride=1
+            stride=1,
+            dropout=False
             ):
         super(Bottleneck, self).__init__()
-
-        self.residual_function = nn.Sequential(
-            nn.Conv2d(
-                in_channels,
-                out_channels,
-                kernel_size=1,
-                bias=False
-                ),
-            nn.BatchNorm2d(out_channels),
-            activation(inplace=True),
-            nn.Conv2d(
-                out_channels,
-                out_channels,
-                stride=stride,
-                kernel_size=3,
-                padding=1,
-                bias=False
-                ),
-            nn.BatchNorm2d(out_channels),
-            activation(inplace=True),
-            nn.Conv2d(
-                out_channels,
-                out_channels * Bottleneck.expansion,
-                kernel_size=1,
-                bias=False
-                ),
-            nn.BatchNorm2d(self.expansion*out_channels)
-        )
+        
+        if dropout: 
+            self.residual_function = nn.Sequential(
+                nn.Conv2d(
+                    in_channels,
+                    out_channels,
+                    kernel_size=1,
+                    bias=False
+                    ),
+                nn.BatchNorm2d(out_channels),
+                activation(inplace=True),
+                nn.Conv2d(
+                    out_channels,
+                    out_channels,
+                    stride=stride,
+                    kernel_size=3,
+                    padding=1,
+                    bias=False
+                    ),
+                nn.BatchNorm2d(out_channels),
+                activation(inplace=True),
+                nn.Dropout(p=0.5),
+                nn.Conv2d(
+                    out_channels,
+                    out_channels * Bottleneck.expansion,
+                    kernel_size=1,
+                    bias=False
+                    ),
+                nn.BatchNorm2d(self.expansion*out_channels)
+            )
+        else:
+            self.residual_function = nn.Sequential(
+                nn.Conv2d(
+                    in_channels,
+                    out_channels,
+                    kernel_size=1,
+                    bias=False
+                    ),
+                nn.BatchNorm2d(out_channels),
+                activation(inplace=True),
+                nn.Conv2d(
+                    out_channels,
+                    out_channels,
+                    stride=stride,
+                    kernel_size=3,
+                    padding=1,
+                    bias=False
+                    ),
+                nn.BatchNorm2d(out_channels),
+                activation(inplace=True),
+                nn.Conv2d(
+                    out_channels,
+                    out_channels * Bottleneck.expansion,
+                    kernel_size=1,
+                    bias=False
+                    ),
+                nn.BatchNorm2d(self.expansion*out_channels)
+            )
+        
         self.shortcut = nn.Sequential()
 
         if stride != 1 or in_channels != out_channels * Bottleneck.expansion:
@@ -375,14 +432,16 @@ class Bottleneck(nn.Module):
 ResNet_block = {
     '18': 'BasicBlock',
     '34': 'BasicBlock',
-    '50': 'Bottleneck'
+    '50': 'Bottleneck',
+    '101': 'Bottleneck'
 }
 
 ResNet_layers = {
 
     '18': [2, 2, 2, 2],
     '34': [3, 4, 6, 3],
-    '50': [3, 4, 6, 3]
+    '50': [3, 4, 6, 3],
+    '101': [3, 4, 23, 3]
 }
 
 
@@ -422,13 +481,14 @@ class ResNet(Classifier):
             ):
         super().__init__(model, architecture, num_classes)
 
-        if (input_dims != 3*32*32):
-            print('Error: input dimensions for ResNet not recognized.\
-                   Expected 3 channels, 32x32 pixels')
-            sys.exit(1)
-
+        # if (input_dims != 3*32*32 or input_dims != 3*64*64):
+        #     print('Error: input dimensions for ResNet not recognized.\
+        #            Expected 3 channels, 32x32 pixels')
+        #     sys.exit(1)
+        print(input_dims)
         self.in_channels = 64
-
+        self.dropout_backbone = architecture['hypers']['dropout_backbone']
+        
         backbone_model = str(self.architecture['backbone_model'])
         if ResNet_block[backbone_model] == 'BasicBlock':
             expansion = BasicBlock.expansion
