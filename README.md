@@ -1,6 +1,3 @@
-# Emergence of Latent Binary Encoding in Deep Neural Network Classifiers
-Code to reproduce results presented in the manuscript [Emergence of Latent Binary Encoding in Deep Neural Network Classifiers](https://arxiv.org/abs/2310.08224).
-
 ### Abstract
 We investigate the emergence of binary encoding within the latent space of deep-neural-network classifiers.
 Such binary encoding is induced by the integration of a linear penultimate layer, which employs during training a loss function specifically designed to compress the latent representations. 
@@ -13,7 +10,7 @@ Code was tested on Python 3.11.8, PyTorch 2.2.1, NumPy 1.26, scikit-learn 1.2.2,
 
 ### Install
 ```
-pip install emergence_binary_encoding
+pip install .
 ```
 
 ### Reproduce results 
