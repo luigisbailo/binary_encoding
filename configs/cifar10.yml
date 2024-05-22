@@ -13,7 +13,7 @@ architecture:
 training:
     hypers:
         batch_size: 128
-        epochs: 1000
+        epochs: 800
         logging: 50
         gamma: 0.01
         gamma_scheduler_factor: 1.05

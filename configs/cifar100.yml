@@ -6,14 +6,14 @@ architecture:
     backbone_model: 50
     hypers:
         nodes_head: []
-        penultimate_nodes: 36
+        penultimate_nodes: 64
         activation: SiLU
 
 
 training:
     hypers:
         batch_size: 128
-        epochs: 1000
+        epochs: 800
         logging: 50
         gamma: 0.01
         gamma_scheduler_factor: 1.05
