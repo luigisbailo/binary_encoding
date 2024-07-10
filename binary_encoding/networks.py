@@ -32,13 +32,13 @@ class Classifier(nn.Module):
 
     def __init__(
             self,
-            model,
+            model_name,
             architecture,
             num_classes):
 
         super(Classifier, self).__init__()
 
-        self.model = model
+        self.model_name = model_name
         self.architecture = architecture
         self.architecture_hypers = architecture['hypers']
         self.nodes_head = architecture['hypers']['nodes_head']
@@ -49,17 +49,18 @@ class Classifier(nn.Module):
         self.activation = getattr(
             torch_module, architecture['hypers']['activation']
             )
-
-        if model == 'bin_enc' or model == 'lin_pen':
+        print(model_name)
+        if model_name == 'bin_enc' or model_name == 'lin_pen':
             self.penultimate_linear_nodes = self.penultimate_nodes
             self.penultimate_nonlinear_nodes = None
-        elif model == 'no_pen':
+        elif model_name == 'no_pen':
             self.penultimate_linear_nodes = None
             self.penultimate_nonlinear_nodes = None
-        elif model == 'nonlin_pen':
+        elif model_name == 'nonlin_pen':
             self.penultimate_linear_nodes = None
             self.penultimate_nonlinear_nodes = self.penultimate_nodes
 
+            
     def reset_parameters(self):
         """
         Resets the parameters of the classifier.
@@ -128,15 +129,25 @@ class Classifier(nn.Module):
             penultimate_layer = nn.Sequential(
                 nn.Linear(input_dims, self.penultimate_nonlinear_nodes),
                 self.activation()
-            )
+            )         
         else:
             penultimate_layer = None
-
-        output_layer = nn.Linear(
-            self.penultimate_linear_nodes or self.penultimate_nonlinear_nodes or input_dims,
-            self.num_classes
-        )
-
+        
+        if self.architecture['hypers']['dropout_penultimate']:    
+            output_layer = nn.Sequential(
+                nn.Linear(
+                    self.penultimate_linear_nodes or self.penultimate_nonlinear_nodes or input_dims,
+                    self.num_classes
+                    ),
+                nn.Dropout(p=0.5)
+            )
+            
+        else:             
+            output_layer = nn.Linear(
+                self.penultimate_linear_nodes or self.penultimate_nonlinear_nodes or input_dims,
+                self.num_classes
+                )
+            
         return penultimate_layer, output_layer
 
     def classifier_forward(
@@ -161,8 +172,8 @@ class Classifier(nn.Module):
             x_pen = self.penultimate_layer(x)
         else:
             x_pen = x
-
         x_output = self.output_layer(x_pen)
+        # print(x.size(), x_output.size())
 
         return x_output.reshape(-1, self.num_classes), x_pen
 
@@ -185,12 +196,12 @@ class MLPvanilla (Classifier):
 
     def __init__(
             self,
-            model,
+            model_name,
             architecture,
             num_classes,
             input_dims
             ):
-        super().__init__(model, architecture, num_classes)
+        super().__init__(model_name, architecture, num_classes)
 
         self.make_head(input_dims_head=input_dims)
         self.penultimate_layer, self.output_layer = self.make_penultimate(
@@ -234,27 +245,29 @@ class BasicBlock(nn.Module):
             in_channels,
             out_channels,
             activation,
+            base_width=1,
             stride=1,
             dropout=False,
     ):
 
         super(BasicBlock, self).__init__()
         
+        width = base_width * out_channels
         if dropout:
             self.residual_function = nn.Sequential(
                 nn.Conv2d(
                     in_channels,
-                    out_channels,
+                    width,
                     stride=stride,
                     kernel_size=3,
                     padding=1,
                     bias=False
                     ),
-                nn.BatchNorm2d(out_channels),
+                nn.BatchNorm2d(width),
                 activation(inplace=True),
                 nn.Dropout(p=0.5),
                 nn.Conv2d(
-                    out_channels,
+                    width,
                     out_channels * BasicBlock.expansion,
                     kernel_size=3,
                     padding=1,
@@ -266,16 +279,16 @@ class BasicBlock(nn.Module):
             self.residual_function = nn.Sequential(
                 nn.Conv2d(
                     in_channels,
-                    out_channels,
+                    width,
                     stride=stride,
                     kernel_size=3,
                     padding=1,
                     bias=False
                     ),
-                nn.BatchNorm2d(out_channels),
+                nn.BatchNorm2d(width),
                 activation(inplace=True),
                 nn.Conv2d(
-                    out_channels,
+                    width,
                     out_channels * BasicBlock.expansion,
                     kernel_size=3,
                     padding=1,
@@ -336,34 +349,36 @@ class Bottleneck(nn.Module):
             in_channels,
             out_channels,
             activation,
+            base_width=1,
             stride=1,
             dropout=False
             ):
         super(Bottleneck, self).__init__()
         
+        width = base_width * out_channels
         if dropout: 
             self.residual_function = nn.Sequential(
                 nn.Conv2d(
                     in_channels,
-                    out_channels,
+                    width,
                     kernel_size=1,
                     bias=False
                     ),
                 nn.BatchNorm2d(out_channels),
                 activation(inplace=True),
                 nn.Conv2d(
-                    out_channels,
-                    out_channels,
+                    width,
+                    width,
                     stride=stride,
                     kernel_size=3,
                     padding=1,
                     bias=False
                     ),
-                nn.BatchNorm2d(out_channels),
+                nn.BatchNorm2d(width),
                 activation(inplace=True),
                 nn.Dropout(p=0.5),
                 nn.Conv2d(
-                    out_channels,
+                    width,
                     out_channels * Bottleneck.expansion,
                     kernel_size=1,
                     bias=False
@@ -374,24 +389,24 @@ class Bottleneck(nn.Module):
             self.residual_function = nn.Sequential(
                 nn.Conv2d(
                     in_channels,
-                    out_channels,
+                    width,
                     kernel_size=1,
                     bias=False
                     ),
-                nn.BatchNorm2d(out_channels),
+                nn.BatchNorm2d(width),
                 activation(inplace=True),
                 nn.Conv2d(
-                    out_channels,
-                    out_channels,
+                    width,
+                    width,
                     stride=stride,
                     kernel_size=3,
                     padding=1,
                     bias=False
                     ),
-                nn.BatchNorm2d(out_channels),
+                nn.BatchNorm2d(width),
                 activation(inplace=True),
                 nn.Conv2d(
-                    out_channels,
+                    width,
                     out_channels * Bottleneck.expansion,
                     kernel_size=1,
                     bias=False
@@ -433,7 +448,8 @@ ResNet_block = {
     '18': 'BasicBlock',
     '34': 'BasicBlock',
     '50': 'Bottleneck',
-    '101': 'Bottleneck'
+    '101': 'Bottleneck',
+    '151': 'Bottleneck',
 }
 
 ResNet_layers = {
@@ -441,7 +457,8 @@ ResNet_layers = {
     '18': [2, 2, 2, 2],
     '34': [3, 4, 6, 3],
     '50': [3, 4, 6, 3],
-    '101': [3, 4, 23, 3]
+    '101': [3, 4, 23, 3],
+    '151': [3, 8, 36, 3]
 }
 
 
@@ -474,33 +491,33 @@ class ResNet(Classifier):
 
     def __init__(
             self,
-            model,
+            model_name,
             architecture,
             num_classes,
             input_dims
             ):
-        super().__init__(model, architecture, num_classes)
+        super().__init__(model_name, architecture, num_classes)
 
         # if (input_dims != 3*32*32 or input_dims != 3*64*64):
         #     print('Error: input dimensions for ResNet not recognized.\
         #            Expected 3 channels, 32x32 pixels')
         #     sys.exit(1)
-        print(input_dims)
         self.in_channels = 64
-        self.dropout_backbone = architecture['hypers']['dropout_backbone']
+        self.dropout_backbone = False
         
-        backbone_model = str(self.architecture['backbone_model'])
-        if ResNet_block[backbone_model] == 'BasicBlock':
+        self.backbone_model = str(self.architecture['backbone_model'])
+        
+        if ResNet_block[self.backbone_model] == 'BasicBlock':
             expansion = BasicBlock.expansion
             self.make_backbone_layers(
                 BasicBlock,
-                ResNet_layers[backbone_model]
+                ResNet_layers[self.backbone_model]
                 )
-        elif ResNet_block[backbone_model] == 'Bottleneck':
+        elif ResNet_block[self.backbone_model] == 'Bottleneck':
             expansion = Bottleneck.expansion
             self.make_backbone_layers(
                 Bottleneck,
-                ResNet_layers[backbone_model]
+                ResNet_layers[self.backbone_model]
                 )
         else:
             print('Error: backbone model not recognized')
@@ -539,7 +556,8 @@ class ResNet(Classifier):
                     self.in_channels,
                     out_channels,
                     self.activation,
-                    stride
+                    base_width = 1,
+                    stride = stride,
                     ))
             self.in_channels = out_channels * block.expansion
 
@@ -554,17 +572,31 @@ class ResNet(Classifier):
             blocks (list): List of number of blocks for each layer.
 
         """
-
-        self.layer0 = nn.Sequential(
-            nn.Conv2d(
-                3,
-                self.in_channels,
-                kernel_size=3,
-                padding=1
-                ),
-            nn.BatchNorm2d(self.in_channels),
-            self.activation(inplace=True),
-        )
+        
+        if int(self.backbone_model)>100 :
+            self.layer0 = nn.Sequential(
+                nn.Conv2d(
+                    3,
+                    self.in_channels,
+                    kernel_size=7,
+                    stride=2,
+                    padding=3 
+                    ),
+                nn.BatchNorm2d(self.in_channels),
+                self.activation(inplace=True),
+                nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+            )
+        else:
+            self.layer0 = nn.Sequential(
+                nn.Conv2d(
+                    3,
+                    self.in_channels,
+                    kernel_size=3,
+                    padding=1
+                    ),
+                nn.BatchNorm2d(self.in_channels),
+                self.activation(inplace=True),
+            )            
         self.layer1 = self.make_layer(block, 64, blocks[0], 1)
         self.layer2 = self.make_layer(block, 128, blocks[1], 2)
         self.layer3 = self.make_layer(block, 256, blocks[2], 2)
@@ -582,7 +614,6 @@ class ResNet(Classifier):
             torch.Tensor: Output tensor.
 
         """
-
         output = self.layer0(x)
         output = self.layer1(output)
         output = self.layer2(output)
@@ -593,3 +624,226 @@ class ResNet(Classifier):
         output = torch.flatten(output, start_dim=1)
 
         return self.classifier_forward(output)
+
+    
+
+class BasicBlock1D(nn.Module):
+    """
+    A basic building block for a residual network.
+
+    Args:
+        in_channels (int): Number of input channels.
+        out_channels (int): Number of output channels.
+        activation (nn.Module): Activation function to be applied.
+        stride (int, optional): Stride value for the convolutional layers. Default is 1.
+
+    Attributes:
+        expansion (int): Expansion factor for the output channels.
+
+    """
+
+    expansion = 1
+
+    def __init__(
+            self,
+            in_channels,
+            out_channels,
+            activation,
+            base_width=1,
+            stride=1,
+            dropout=False,
+    ):
+
+        super(BasicBlock1D, self).__init__()
+        
+        width = base_width * out_channels
+        if dropout:
+            self.residual_function = nn.Sequential(
+                nn.Conv1d(
+                    in_channels,
+                    width,
+                    stride=stride,
+                    kernel_size=3,
+                    padding=1,
+                    bias=False
+                    ),
+                nn.BatchNorm1d(width),
+                activation(inplace=True),
+                nn.Dropout(p=0.5),
+                nn.Conv1d(
+                    width,
+                    out_channels * BasicBlock.expansion,
+                    kernel_size=3,
+                    padding=1,
+                    bias=False
+                    ),
+                nn.BatchNorm1d(self.expansion*out_channels)
+                )
+        else:
+            self.residual_function = nn.Sequential(
+                nn.Conv1d(
+                    in_channels,
+                    width,
+                    stride=stride,
+                    kernel_size=3,
+                    padding=1,
+                    bias=False
+                    ),
+                nn.BatchNorm1d(width),
+                activation(inplace=True),
+                nn.Conv1d(
+                    width,
+                    out_channels * BasicBlock.expansion,
+                    kernel_size=3,
+                    padding=1,
+                    bias=False
+                    ),
+                nn.BatchNorm1d(self.expansion*out_channels)
+                )
+
+        self.shortcut = nn.Sequential()
+
+        if stride != 1 or in_channels != out_channels * BasicBlock.expansion:
+            self.shortcut = nn.Sequential(
+                nn.Conv1d(
+                    in_channels,
+                    out_channels * BasicBlock.expansion,
+                    stride=stride,
+                    kernel_size=1,
+                    bias=False
+                    ),
+                nn.BatchNorm1d(out_channels * BasicBlock.expansion)
+            )
+        self.activation = activation
+
+    def forward(self, x):
+        """
+        Forward pass of the basic block.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Output tensor.
+
+        """
+        x_output = self.residual_function(x) + self.shortcut(x)
+        return self.activation(inplace=True)(x_output)
+
+
+class Bottleneck1D(nn.Module):
+    """
+    Bottleneck block for a ResNet network.
+
+    Args:
+        in_channels (int): Number of input channels.
+        out_channels (int): Number of output channels.
+        activation (nn.Module): Activation function to be applied.
+        stride (int, optional): Stride value for the convolutional layers. Default is 1.
+
+    Attributes:
+        expansion (int): Expansion factor for the output channels.
+
+    """
+
+    expansion = 4
+
+    def __init__(
+            self,
+            in_channels,
+            out_channels,
+            activation,
+            base_width=1,
+            stride=1,
+            dropout=False
+            ):
+        super(Bottleneck1D, self).__init__()
+        
+        width = base_width * out_channels
+        if dropout: 
+            self.residual_function = nn.Sequential(
+                nn.Conv1d(
+                    in_channels,
+                    width,
+                    kernel_size=1,
+                    bias=False
+                    ),
+                nn.BatchNorm1d(out_channels),
+                activation(inplace=True),
+                nn.Conv1d(
+                    width,
+                    width,
+                    stride=stride,
+                    kernel_size=3,
+                    padding=1,
+                    bias=False
+                    ),
+                nn.BatchNorm1d(width),
+                activation(inplace=True),
+                nn.Dropout(p=0.5),
+                nn.Conv1d(
+                    width,
+                    out_channels * Bottleneck.expansion,
+                    kernel_size=1,
+                    bias=False
+                    ),
+                nn.BatchNorm1d(self.expansion*out_channels)
+            )
+        else:
+            self.residual_function = nn.Sequential(
+                nn.Conv1d(
+                    in_channels,
+                    width,
+                    kernel_size=1,
+                    bias=False
+                    ),
+                nn.BatchNorm1d(width),
+                activation(inplace=True),
+                nn.Conv1d(
+                    width,
+                    width,
+                    stride=stride,
+                    kernel_size=3,
+                    padding=1,
+                    bias=False
+                    ),
+                nn.BatchNorm1d(width),
+                activation(inplace=True),
+                nn.Conv1d(
+                    width,
+                    out_channels * Bottleneck.expansion,
+                    kernel_size=1,
+                    bias=False
+                    ),
+                nn.BatchNorm1d(self.expansion*out_channels)
+            )
+        
+        self.shortcut = nn.Sequential()
+
+        if stride != 1 or in_channels != out_channels * Bottleneck.expansion:
+            self.shortcut = nn.Sequential(
+                nn.Conv1d(
+                    in_channels,
+                    out_channels * Bottleneck.expansion,
+                    stride=stride,
+                    kernel_size=1,
+                    bias=False
+                    ),
+                nn.BatchNorm1d(out_channels * Bottleneck.expansion)
+            )
+        self.activation = activation
+
+    def forward(self, x):
+        """
+        Forward pass of the Bottleneck block.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Output tensor.
+
+        """
+        x_output = self.residual_function(x) + self.shortcut(x)
+        return self.activation(inplace=True)(x_output)
+
