@@ -93,7 +93,7 @@ if __name__ == '__main__':
     parser.add_argument('--model', required=True)
     parser.add_argument('--sample', required=False)
     parser.add_argument('--lr', required=False)
-    parser.add_argument('--dropout', required=False)
+    parser.add_argument('--dropout-penultimate', required=False)
     parser.add_argument('--augment', required=False)
     parser.add_argument('--encoding-metrics', required=False)
     parser.add_argument('--store-penultimate', required=False)
@@ -131,13 +131,13 @@ if __name__ == '__main__':
         encoding_metrics = encoding_metrics == 'true'
         
     # If dropout is not provided, default to False
-    dropout = dropout.lower() if dropout else False
-    if dropout not in ['true', 'false']:
+    dropout_penultimate = dropout_penultimate.lower() if dropout_penultimate else False
+    if dropout_penultimate not in ['true', 'false']:
         print("Invalid value for dropout. Defaulting to False.")
-        dropout = False
+        dropout_penultimate = False
     else:
-        dropout = dropout == 'true'
-    architecture['hypers']['dropout_backbone'] = dropout
+        dropout_penultimate = dropout_penultimate == 'true'
+    architecture['hypers']['dropout_penultimate'] = dropout_penultimate
 
     # If augment is not provided, default to False
     augment = augment.lower() if augment else False
