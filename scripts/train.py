@@ -261,7 +261,7 @@ if __name__ == '__main__':
     print(architecture['hypers'])
     
     if penultimate_nodes:
-        model_name = model_name + '_wide'
+        model_name = '512 _' + model_name
     if dropout_penultimate:
         model_name = 'dropout_' + model_name
     if sample:
