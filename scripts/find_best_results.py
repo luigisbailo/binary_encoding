@@ -14,7 +14,7 @@ args = parser.parse_args()
 results_dir = args.results_dir
 output_dir = args.output_dir
 
-models = ['bin_enc', 'wide_bin_enc', 'no_pen', 'dropout_no_pen', 'lin_pen', 'dropout_lin_pen', 'nonlin_pen']
+models = ['512_bin_enc', 'bin_enc', 'no_pen', 'dropout_no_pen', 'lin_pen', 'dropout_lin_pen', 'nonlin_pen']
 
 results = {}
 
@@ -37,6 +37,8 @@ for model in models:
     
     res_dict = {}
     for key in best_res_list[0].keys():
+        if key == 'penultimate_train' or key == 'penultimate_test':
+            continue
         if isinstance (best_res_list[0][key], dict):
             res_dict[key] = {}
             for key2 in best_res_list[0][key].keys():
