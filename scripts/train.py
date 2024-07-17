@@ -90,10 +90,11 @@ if __name__ == '__main__':
     parser.add_argument('--config', required=True)
     parser.add_argument('--results-dir', required=True)
     parser.add_argument('--dataset-dir', required=True)
-    parser.add_argument('--model', required=True)
+    parser.add_argument('--model-name', required=True)
     parser.add_argument('--sample', required=False)
     parser.add_argument('--lr', required=False)
     parser.add_argument('--dropout-penultimate', required=False)
+    parser.add_argument('--penultimate-nodes', required=False)
     parser.add_argument('--augment', required=False)
     parser.add_argument('--encoding-metrics', required=False)
     parser.add_argument('--store-penultimate', required=False)
@@ -103,10 +104,11 @@ if __name__ == '__main__':
     config_file = args.config
     results_dir = args.results_dir
     dataset_dir = args.dataset_dir
-    model = args.model
+    model_name = args.model_name
     sample = args.sample
     lr = args.lr
-    dropout = args.dropout
+    penultimate_nodes = args.penultimate_nodes
+    dropout_penultimate = args.dropout_penultimate
     augment = args.augment
     encoding_metrics = args.encoding_metrics
     store_penultimate = args.store_penultimate
@@ -121,6 +123,9 @@ if __name__ == '__main__':
         if lr.startswith('.'):
             lr = '0'+lr
         training_hypers['lr'] = float(lr)
+   # Overwrite penultimate nodes if provided as argument
+    if penultimate_nodes:
+        architecture['hypers']['penultimate_nodes'] = int(penultimate_nodes)
 
     # If encoding_metrics is not provided, default to False
     encoding_metrics = encoding_metrics.lower() if encoding_metrics else False
@@ -169,9 +174,10 @@ if __name__ == '__main__':
 
     
     if (name_dataset == 'SVHN'):
+        trainset_mean, trainset_std = compute_mean_std(trainset)
         transform_train = transforms.Compose([
             transforms.ToTensor(),
-            transforms.Normalize(0.5, 0.5),
+            transforms.Normalize(trainset_mean, trainset_std),
             transforms.RandomHorizontalFlip(),
             transforms.RandomCrop(trainset[0][0][0][0].shape[0], padding=4),
             Resize((32, 32)),  
@@ -179,7 +185,7 @@ if __name__ == '__main__':
         ])
         transform_test = transforms.Compose([
             transforms.ToTensor(),
-            transforms.Normalize(0.5, 0.5),
+            transforms.Normalize(trainset_mean, trainset_std),
             Resize((32, 32)),  
 
         ])
@@ -219,11 +225,11 @@ if __name__ == '__main__':
     training_hypers = convert_bool(training_hypers)
     architecture['hypers'] = convert_bool(architecture['hypers'])
 
-    print('Training ' + str(model) + ' architecture:')
+    print('Training ' + str(model_name) + ' architecture:')
     print('Learning rate: ', training_hypers['lr'])
 
     classifier = getattr(networks, architecture['backbone'])(
-        model=model,
+        model_name=model_name,
         architecture=architecture,
         num_classes=num_classes,
         input_dims=input_dims,
@@ -234,14 +240,13 @@ if __name__ == '__main__':
     if torch.cuda.is_available():
         classifier = classifier.to(device)
 
-
     results = Trainer(
         device=device,
         network=classifier,
         trainset=trainset,
         testset=testset,
         training_hypers=training_hypers,
-        model=model,
+        model_name=model_name,
         encoding_metrics=encoding_metrics,
         store_penultimate=store_penultimate,
         verbose=True
@@ -252,16 +257,17 @@ if __name__ == '__main__':
     results['training_hypers'] = training_hypers
     results['architecture'] = architecture
     
-    if dropout:
-        if sample:
-            file_name = '/dropout_' + model + '_' + sample + '.pkl'
-        else:
-            file_name = '/dropout_' + model + '.pkl'
-    else:
-        if sample:
-            file_name = '/' + model + '_' + sample + '.pkl'
-        else:
-            file_name = '/' + model + '_' + '.pkl'
+    print('penultimate nodes: ', penultimate_nodes)
+    print(architecture['hypers'])
+    
+    if penultimate_nodes:
+        model_name = model_name + '_wide'
+    if dropout_penultimate:
+        model_name = 'dropout_' + model_name
+    if sample:
+        model_name = model_name + '_' + sample
+
+    file_name = '/' + model_name + '_' + '.pkl'
     
     print(file_name)
             
