@@ -1,7 +1,7 @@
 #!/bin/bash -l
 
 factor_lr=2
-steps_lr=3
+steps_lr=2
 
 config=$1
 id_name=$2
@@ -31,7 +31,7 @@ if [ -e run_job* ]; then
 fi
 
 
-for k in 1 2 3 4 5; do
+for k in 1 2 3 4; do
 
     if [ -d "$results_dir/$id_name/$k" ]; then
         rm -r "$results_dir/$id_name/$k"
@@ -58,12 +58,15 @@ for k in 1 2 3 4 5; do
         echo '#SBATCH --export=NONE' >> run_job.sh
         echo 'unset SLURM_EXPORT_ENV' >> run_job.sh
         echo 'module load python' >> run_job.sh
-        echo 'conda activate bin_enc' >> run_job.sh
+        echo 'conda activate be' >> run_job.sh
 
 
         sed "2a\#SBATCH --output=$output_dir/$id_name/$k/bin_enc_$i.out" run_job.sh > ./run_job_bin_enc.sh
         sed -i "2a\#SBATCH --job-name=$id_name\_$k_$i\_bin_enc" run_job_bin_enc.sh
 
+        sed "2a\#SBATCH --output=$output_dir/$id_name/$k/bin_enc_wide_$i.out" run_job.sh > ./run_job_bin_enc_wide.sh
+        sed -i "2a\#SBATCH --job-name=$id_name\_$k_$i\_bin_enc_wide" run_job_bin_enc_wide.sh
+        
         sed "2a\#SBATCH --output=$output_dir/$id_name/$k/no_pen_$i.out" run_job.sh > ./run_job_no_pen.sh
         sed -i "2a\#SBATCH --job-name=$id_name\_$k_$i\_no_pen" run_job_no_pen.sh
 
@@ -72,21 +75,28 @@ for k in 1 2 3 4 5; do
         
         sed "2a\#SBATCH --output=$output_dir/$id_name/$k/lin_pen_$i.out" run_job.sh > ./run_job_lin_pen.sh
         sed -i "2a\#SBATCH --job-name=$id_name\_$k_$i\_lin_pen" run_job_lin_pen.sh
+        
+        sed "2a\#SBATCH --output=$output_dir/$id_name/$k/lin_pen_dropout_$i.out" run_job.sh > ./run_job_lin_pen_dropout.sh
+        sed -i "2a\#SBATCH --job-name=$id_name\_$k_$i\_lin_pen_dropout" run_job_lin_pen_dropout.sh
 
         sed "2a\#SBATCH --output=$output_dir/$id_name/$k/nonlin_pen_$i.out" run_job.sh > ./run_job_nonlin_pen.sh
         sed -i "2a\#SBATCH --job-name=$id_name\_$k_$i\_nonlin_pen" run_job_nonlin_pen.sh
 
 
-        echo "python scripts/train.py --config  $config  --model bin_enc --dropout False --augment True --lr $lr  --encoding-metrics True --store-penultimate True --results-dir $results_dir/$id_name/$k --dataset-dir $dataset_dir --sample $i" >> run_job_bin_enc.sh
-        echo "python scripts/train.py --config  $config  --model no_pen --dropout False --augment True --lr $lr --encoding-metrics True --store-penultimate False --results-dir $results_dir/$id_name/$k --dataset-dir $dataset_dir --sample $i" >> run_job_no_pen.sh
-        echo "python scripts/train.py --config  $config  --model no_pen --dropout True --augment True --lr $lr --encoding-metrics True --store-penultimate False --results-dir $results_dir/$id_name/$k --dataset-dir $dataset_dir --sample $i" >> run_job_no_pen_dropout.sh
-        echo "python scripts/train.py --config  $config  --model lin_pen --dropout False --augment True --lr $lr  --encoding-metrics True --store-penultimate False --results-dir $results_dir/$id_name/$k --dataset-dir $dataset_dir --sample $i" >> run_job_lin_pen.sh
-        echo "python scripts/train.py --config  $config  --model nonlin_pen --dropout False --augment True --lr $lr --encoding-metrics True --store-penultimate False --results-dir $results_dir/$id_name/$k --dataset-dir $dataset_dir --sample $i" >> run_job_nonlin_pen.sh
+        echo "python scripts/train.py --config  $config  --model-name bin_enc  --dropout-penultimate False --lr $lr  --encoding-metrics True --store-penultimate True --results-dir $results_dir/$id_name/$k --dataset-dir $dataset_dir --sample $i" >> run_job_bin_enc.sh
+        echo "python scripts/train.py --config  $config  --model-name bin_enc  --dropout-penultimate False --penultimate-nodes 512 --lr $lr  --encoding-metrics True --store-penultimate False --results-dir $results_dir/$id_name/$k --dataset-dir $dataset_dir --sample $i" >> run_job_bin_enc_wide.sh
+        echo "python scripts/train.py --config  $config  --model-name no_pen  --dropout-penultimate False --lr $lr --encoding-metrics True --store-penultimate False --results-dir $results_dir/$id_name/$k --dataset-dir $dataset_dir --sample $i" >> run_job_no_pen.sh
+        echo "python scripts/train.py --config  $config  --model-name no_pen  --dropout-penultimate True --lr $lr --encoding-metrics True --store-penultimate False --results-dir $results_dir/$id_name/$k --dataset-dir $dataset_dir --sample $i" >> run_job_no_pen_dropout.sh
+        echo "python scripts/train.py --config  $config  --model-name lin_pen  --dropout-penultimate False --lr $lr  --encoding-metrics True --store-penultimate False --results-dir $results_dir/$id_name/$k --dataset-dir $dataset_dir --sample $i" >> run_job_lin_pen.sh
+        echo "python scripts/train.py --config  $config  --model-name lin_pen  --dropout-penultimate True --lr $lr  --encoding-metrics True --store-penultimate False --results-dir $results_dir/$id_name/$k --dataset-dir $dataset_dir --sample $i" >> run_job_lin_pen_dropout.sh
+        echo "python scripts/train.py --config  $config  --model-name nonlin_pen  --dropout-penultimate False --lr $lr --encoding-metrics True --store-penultimate False --results-dir $results_dir/$id_name/$k --dataset-dir $dataset_dir --sample $i" >> run_job_nonlin_pen.sh
 
         sbatch ./run_job_bin_enc.sh 
+        sbatch ./run_job_bin_enc_wide.sh 
         sbatch ./run_job_no_pen.sh 
         sbatch ./run_job_no_pen_dropout.sh 
         sbatch ./run_job_lin_pen.sh 
+        sbatch ./run_job_lin_pen_dropout.sh 
         sbatch ./run_job_nonlin_pen.sh 
 
         cp $config $results_dir/$id_name/$k/config.yml

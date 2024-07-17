@@ -14,16 +14,14 @@ args = parser.parse_args()
 results_dir = args.results_dir
 output_dir = args.output_dir
 
-models = ['bin_enc',  'no_pen', 'lin_pen', 'nonlin_pen']
+models = ['bin_enc', 'wide_bin_enc', 'no_pen', 'dropout_no_pen', 'lin_pen', 'dropout_lin_pen', 'nonlin_pen']
 
 results = {}
 
 for model in models:
-
     best_res_list = []    
     for entry in os.listdir(results_dir):
-
-        if (os.path.isdir(results_dir + '/' + entry)):
+        if (os.path.isdir(results_dir + '/' + entry) and entry != '.ipynb_checkpoints'):
             max_acc = 0
             best_res = None
             file_pattern = f'{results_dir}{"/"}{entry}{"/"}{model}*{"pkl"}'
@@ -39,7 +37,6 @@ for model in models:
     
     res_dict = {}
     for key in best_res_list[0].keys():
-        
         if isinstance (best_res_list[0][key], dict):
             res_dict[key] = {}
             for key2 in best_res_list[0][key].keys():
@@ -51,4 +48,3 @@ for model in models:
     
 with open (output_dir + '/best_results.pkl', 'wb') as file:
     pickle.dump(results, file)
-
