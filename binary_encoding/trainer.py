@@ -36,14 +36,14 @@ class Trainer():
     - res_dict_stack (dict): A dictionary containing the stacked training results.
     """
 
-    def __init__(self, device, network, trainset, testset, training_hypers, model,
+    def __init__(self, device, network, trainset, testset, training_hypers, model_name,
                  encoding_metrics=False, store_penultimate=False, verbose=True):
         self.device = device
         self.network = network
         self.trainset = trainset
         self.testset = testset
         self.training_hypers = training_hypers
-        self.model = model
+        self.model_name = model_name
         self.encoding_metrics = encoding_metrics
         self.store_penultimate = store_penultimate
         self.verbose = verbose
@@ -109,7 +109,7 @@ class Trainer():
                     x_output_batch, y_batch)
                 loss = loss_classification
 
-                if self.model == 'bin_enc':
+                if self.model_name == 'bin_enc':
                     loss_encoding = nn.functional.mse_loss(
                         x_penultimate_batch,
                         torch.zeros(x_penultimate_batch.shape).to(self.device),
@@ -152,7 +152,7 @@ class Trainer():
                 res_epoch['same_encoding_fraction_train'] = get_same_encoding_fraction(eval_train)
                 res_epoch['same_encoding_fraction_test'] = get_same_encoding_fraction(eval_test)
                 
-                if self.model == 'bin_enc' or self.model == 'lin_pen':
+                if self.model_name == 'bin_enc' or self.model_name == 'lin_pen':
                     res_epoch['binarity_train'] = get_binarity_metrics(eval_train)
                     res_epoch['binarity_test'] = get_binarity_metrics(eval_test)
 
@@ -180,9 +180,6 @@ class Trainer():
                     converged = True
                     print('converged!', epoch)
                     convergence_epoch = epoch
-                    perturbation_score_converged = np.mean(perturbation_list)
-                    mahalanobis_score_converged = get_mahalanobis_score(eval_train, eval_test)
-                    accuracy_test_converged = eval_test['accuracy']
 
                 if last_epoch:
                     perturbation_score_tpt = np.mean(perturbation_list)
@@ -217,10 +214,7 @@ class Trainer():
             else:                
                 res_dict_stack[key] = np.vstack([res_epoch[key] for res_epoch in res_list])
         
-        res_dict_stack['mahalanobis_score_converged'] = mahalanobis_score_converged
-        res_dict_stack['perturbation_score_converged'] = perturbation_score_converged
         res_dict_stack['convergence_epoch'] = convergence_epoch
-        res_dict_stack['accuracy_test_converged'] = accuracy_test_converged
 
         res_dict_stack['mahalanobis_score_tpt'] = mahalanobis_score_tpt
         res_dict_stack['perturbation_score_tpt'] = perturbation_score_tpt
