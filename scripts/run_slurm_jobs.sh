@@ -31,7 +31,7 @@ if [ -e run_job* ]; then
 fi
 
 
-for k in 1 2 3 4; do
+for k in 1 2 3; do
 
     if [ -d "$results_dir/$id_name/$k" ]; then
         rm -r "$results_dir/$id_name/$k"
@@ -58,7 +58,7 @@ for k in 1 2 3 4; do
         echo '#SBATCH --export=NONE' >> run_job.sh
         echo 'unset SLURM_EXPORT_ENV' >> run_job.sh
         echo 'module load python' >> run_job.sh
-        echo 'conda activate be' >> run_job.sh
+        echo 'conda activate bin_enc' >> run_job.sh
 
 
         sed "2a\#SBATCH --output=$output_dir/$id_name/$k/bin_enc_$i.out" run_job.sh > ./run_job_bin_enc.sh
